@@ -128,7 +128,23 @@ class TestCache:
         assert await cache.get(pytest.KEY) == "lol"
 
     @pytest.mark.asyncio
+    async def test_set_optimistic_lock_unexisting(self, cache):
+        await cache.get(pytest.KEY, watch=True)
+        assert await cache.set(pytest.KEY, "lol", optimistic_lock=True) is True
+        assert await cache.get(pytest.KEY) == "lol"
+
+    @pytest.mark.asyncio
     async def test_set_optimistic_lock_race(self, cache):
+        await cache.set(pytest.KEY, "value")
+        await cache.get(pytest.KEY, watch=True)
+        await cache.set(pytest.KEY, "immaracecondition")
+        with pytest.raises(exceptions.WatchError):
+            await cache.set(pytest.KEY, "lol", optimistic_lock=True)
+
+        assert await cache.get(pytest.KEY) == "immaracecondition"
+
+    @pytest.mark.asyncio
+    async def test_set_optimistic_lock_race_unexisting(self, cache):
         await cache.get(pytest.KEY, watch=True)
         await cache.set(pytest.KEY, "immaracecondition")
         with pytest.raises(exceptions.WatchError):
@@ -263,6 +279,7 @@ class TestMemoryCache:
 
     @pytest.mark.asyncio
     async def test_watched_keys_not_leaking(self, memory_cache):
+        await memory_cache.set(pytest.KEY, "value")
         await memory_cache.watch(pytest.KEY)
         await memory_cache.watch(pytest.KEY_1)
         assert len(memory_cache._watched_keys) == 2
@@ -280,6 +297,17 @@ class TestMemcachedCache:
         assert await memcached_cache.raw("get", b"key") == b"value"
         assert await memcached_cache.raw("prepend", b"key", b"super") is True
         assert await memcached_cache.raw("get", b"key") == b"supervalue"
+
+    @pytest.mark.asyncio
+    async def test_watched_keys_not_leaking(self, memcached_cache):
+        await memcached_cache.set(pytest.KEY, "value")
+        await memcached_cache.watch(pytest.KEY)
+        await memcached_cache.watch(pytest.KEY_1)
+        assert len(memcached_cache._watched_keys) == 2
+
+        await memcached_cache.set(pytest.KEY, "value", optimistic_lock=True)
+        await memcached_cache.set(pytest.KEY_1, "value", optimistic_lock=True)
+        assert len(memcached_cache._watched_keys) == 0
 
 
 class TestRedisCache:
@@ -306,7 +334,7 @@ class TestRedisCache:
         assert other_cache.db == 0
 
     @pytest.mark.asyncio
-    async def test_watched_keys_not_leaking(self, redis_cache):
+    async def test_watched_keys_conns_not_leaking(self, redis_cache):
         await asyncio.gather(redis_cache.watch(pytest.KEY), redis_cache.watch(pytest.KEY))
         assert len(redis_cache._watched_keys["test:" + pytest.KEY]) == 2
 

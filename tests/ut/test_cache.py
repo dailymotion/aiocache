@@ -280,6 +280,18 @@ class TestCache:
             await mock_cache.clear(pytest.KEY)
 
     @pytest.mark.asyncio
+    async def test_watch(self, mock_cache):
+        await mock_cache.watch(pytest.KEY)
+        mock_cache._watch.assert_called_with(mock_cache._build_key(pytest.KEY))
+
+    @pytest.mark.asyncio
+    async def test_watch_timeouts(self, mock_cache):
+        mock_cache._watch = self.asleep
+
+        with pytest.raises(asyncio.TimeoutError):
+            await mock_cache.watch(pytest.KEY)
+
+    @pytest.mark.asyncio
     async def test_raw(self, mock_cache):
         await mock_cache.raw("get", pytest.KEY)
         mock_cache._raw.assert_called_with("get", mock_cache._build_key(pytest.KEY))

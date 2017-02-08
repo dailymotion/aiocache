@@ -27,6 +27,7 @@ The supported operations are:
   - exists
   - expire
   - clear
+  - watch
   - raw
 
 

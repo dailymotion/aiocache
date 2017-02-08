@@ -23,6 +23,7 @@ def set_settings():
 def memcached(event_loop):
     memcached = MemcachedBackend(loop=event_loop)
     memcached.client = MagicMock(spec=aiomcache.Client)
+    memcached._watched_keys.clear()
     yield memcached
 
 
@@ -79,6 +80,15 @@ class TestMemcachedBackend:
         memcached.client.get.return_value = b"value"
         assert await memcached._get(pytest.KEY) == b"value"
         memcached.client.get.assert_called_with(pytest.KEY)
+
+    @pytest.mark.asyncio
+    async def test_get_watch(self, memcached):
+        memcached.client.get.return_value = b"value"
+        memcached.client.gets.return_value = "value", "token"
+        await memcached._get(pytest.KEY, watch=True)
+        await memcached._get(pytest.KEY_1, watch=True)
+        assert pytest.KEY in memcached._watched_keys
+        assert pytest.KEY_1 in memcached._watched_keys
 
     @pytest.mark.asyncio
     async def test_set(self, memcached):
@@ -163,6 +173,15 @@ class TestMemcachedBackend:
     async def test_clear_with_namespace(self, memcached):
         with pytest.raises(ValueError):
             await memcached._clear("nm")
+
+    @pytest.mark.asyncio
+    async def test_watch(self, memcached):
+        memcached.client.gets.return_value = "value", "token"
+        await memcached._watch(pytest.KEY)
+        await memcached._watch(pytest.KEY_1)
+        assert len(memcached._watched_keys) == 2
+        assert memcached._watched_keys[pytest.KEY] == "token"
+        assert memcached._watched_keys[pytest.KEY_1] == "token"
 
     @pytest.mark.asyncio
     async def test_raw(self, memcached):

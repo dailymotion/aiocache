@@ -3,11 +3,14 @@ import aiomcache
 
 import aiocache
 
+from aiocache.exceptions import WatchError
+
 
 class MemcachedBackend:
 
     DEFAULT_ENDPOINT = "127.0.0.1"
     DEFAULT_PORT = 11211
+    _watched_keys = {}
 
     def __init__(self, endpoint=None, port=None, loop=None, **kwargs):
         super().__init__(**kwargs)
@@ -32,6 +35,8 @@ class MemcachedBackend:
         :param key: str
         :returns: obj in key if found else None
         """
+        if watch:
+            await self._watch(key)
         value = await self.client.get(key)
         if value is not None and self.encoding is not None:
             return bytes.decode(value)
@@ -61,8 +66,16 @@ class MemcachedBackend:
         :param ttl: int
         :returns: True
         """
+        if optimistic_lock is True and key in self._watched_keys:
+            return await self._cas(key, value, self._watched_keys.pop(key), ttl=ttl)
         value = str.encode(value) if isinstance(value, str) else value
         return await self.client.set(key, value, exptime=ttl or 0)
+
+    async def _cas(self, key, value, token, ttl=0):
+        value = str.encode(value) if isinstance(value, str) else value
+        stored = await self.client.cas(key, value, token, exptime=ttl or 0)
+        if not stored:
+            raise WatchError("Key {} was changed before current transaction".format(key))
 
     async def _multi_set(self, pairs, ttl=0):
         """
@@ -147,6 +160,8 @@ class MemcachedBackend:
         :param key: str
         :returns: True
         """
+        _, token = await self.client.gets(key)
+        MemcachedBackend._watched_keys[key] = token or "0"
         return True
 
     async def _raw(self, command, *args, **kwargs):

@@ -365,10 +365,10 @@ class BaseCache:
         start = time.time()
         ns_key = self._build_key(key, namespace=namespace)
         ret = await self._watch(ns_key)
-        logger.debug("CLEAR %s %d (%.4f)s", namespace, ret, time.time() - start)
+        logger.debug("WATCH %s %d (%.4f)s", namespace, ret, time.time() - start)
         return ret
 
-    async def _watch(self, key, namespace):
+    async def _watch(self, key):
         raise NotImplementedError()
 
     @API.register

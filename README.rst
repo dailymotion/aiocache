@@ -26,6 +26,7 @@ This library aims for simplicity over specialization. It provides a common inter
 - ``exists``
 - ``expire``
 - ``clear``
+- ``watch``
 - ``raw``: Sends raw command to the underlying client
 
 
