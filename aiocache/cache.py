@@ -37,7 +37,7 @@ class API:
             timeout = timeout or self.timeout
             if timeout == 0 or timeout is None:
                 return await fn(self, *args, **kwargs)
-            return await asyncio.wait_for(fn(self, *args, **kwargs), timeout)
+            return await asyncio.shield(asyncio.wait_for(fn(self, *args, **kwargs), timeout))
 
         return _timeout
 
