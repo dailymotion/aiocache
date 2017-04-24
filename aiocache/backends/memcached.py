@@ -44,7 +44,8 @@ class MemcachedBackend:
         :returns: list of obj for each key found, else if not found
         """
         values = []
-        for value in await self.client.multi_get(*keys):
+        result = tasks.append(asyncio.ensure_future(self.client.multi_get(*keys)))
+        for value in result:
             if value is not None and self.encoding is not None:
                 values.append(bytes.decode(value))
             else:
